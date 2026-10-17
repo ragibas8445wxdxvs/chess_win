@@ -1,0 +1,1751 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الشطرنج الاحترافي المطور v2.0 | Pro Chess Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <style>
+        :root {
+            --bg-main: #0f172a;
+            --bg-panel: rgba(30, 41, 59, 0.88);
+            --border-color: rgba(255, 255, 255, 0.12);
+            --accent: #eab308;
+            --accent-hover: #ca8a04;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            
+            --board-light: #eeeed2;
+            --board-dark: #769656;
+            --highlight-move: rgba(255, 255, 51, 0.45);
+            --highlight-selected: rgba(186, 202, 43, 0.75);
+            --highlight-hint: rgba(59, 130, 246, 0.65);
+        }
+
+        [data-theme="wood"] {
+            --board-light: #f0d9b5;
+            --board-dark: #b58863;
+        }
+
+        [data-theme="ocean"] {
+            --board-light: #dee3e6;
+            --board-dark: #4b7399;
+        }
+
+        [data-theme="cyber"] {
+            --board-light: #334155;
+            --board-dark: #0f172a;
+            --highlight-move: rgba(56, 189, 248, 0.35);
+            --highlight-selected: rgba(168, 85, 247, 0.55);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: radial-gradient(circle at top right, #1e293b, #090d16);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            overflow-x: hidden;
+        }
+
+        .app-container {
+            display: grid;
+            grid-template-columns: 310px auto 330px;
+            gap: 24px;
+            max-width: 1440px;
+            width: 100%;
+            align-items: start;
+        }
+
+        /* على الجوال والتابلت: وضع الرقعة أولاً ثم اللوحات */
+        @media (max-width: 1180px) {
+            .app-container {
+                grid-template-columns: 1fr;
+                justify-items: center;
+            }
+            .center-stage {
+                order: -1;
+            }
+            .panel {
+                width: 100%;
+                max-width: 640px;
+            }
+        }
+
+        .panel {
+            background: var(--bg-panel);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 18px;
+            padding: 20px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        .panel-title {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .center-stage {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .player-bar {
+            width: 100%;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 10px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .player-bar.active-turn {
+            border-color: var(--accent);
+            box-shadow: 0 0 18px rgba(234, 179, 8, 0.25);
+        }
+
+        .player-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+
+        .avatar.ai-avatar {
+            background: linear-gradient(135deg, #a855f7, #6b21a8);
+        }
+
+        .player-details h4 {
+            font-size: 1rem;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .captured-area {
+            display: flex;
+            align-items: center;
+            min-height: 22px;
+            gap: 1px;
+            margin-top: 2px;
+        }
+
+        .captured-piece {
+            width: 18px;
+            height: 18px;
+            margin-left: -4px;
+        }
+
+        .material-badge {
+            font-size: 0.75rem;
+            background: rgba(255,255,255,0.12);
+            padding: 1px 6px;
+            border-radius: 6px;
+            margin-right: 8px;
+            font-weight: 700;
+            color: #fde047;
+        }
+
+        .clock {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.4rem;
+            font-weight: 900;
+            background: rgba(0, 0, 0, 0.45);
+            padding: 6px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.08);
+            letter-spacing: 1px;
+        }
+
+        .clock.low-time {
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.5);
+            animation: pulseClock 1s infinite;
+        }
+
+        @keyframes pulseClock {
+            50% { opacity: 0.6; }
+        }
+
+        .board-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            position: relative;
+        }
+
+        /* شريط التقييم يدعم الانقلاب مع الرقعة */
+        .eval-bar-container {
+            width: 24px;
+            height: min(78vw, 600px);
+            background: #1e293b;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.15);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        .eval-bar-container.flipped {
+            flex-direction: column-reverse;
+        }
+
+        .eval-black {
+            background: #262421;
+            width: 100%;
+            height: 50%;
+            transition: height 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .eval-white {
+            background: #f1f5f9;
+            width: 100%;
+            flex: 1;
+        }
+
+        .eval-score {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            font-size: 0.65rem;
+            font-weight: 900;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #eab308;
+            text-shadow: 0 1px 3px #000, 0 0 2px #000;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .chessboard {
+            width: min(78vw, 600px);
+            height: min(78vw, 600px);
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            border: 8px solid #1e293b;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65);
+            position: relative;
+            direction: ltr;
+            touch-action: none;
+        }
+
+        .square {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: pointer;
+            transition: background-color 0.12s ease;
+        }
+
+        .square.light { background-color: var(--board-light); }
+        .square.dark { background-color: var(--board-dark); }
+
+        .square.selected { background-color: var(--highlight-selected) !important; }
+        .square.last-move { background-color: var(--highlight-move) !important; }
+        .square.drag-over { box-shadow: inset 0 0 0 4px var(--accent); }
+
+        .square.hint-square {
+            background-color: var(--highlight-hint) !important;
+            animation: pulseHint 1.2s infinite;
+        }
+
+        @keyframes pulseHint {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.25); }
+        }
+
+        .square.in-check {
+            background: radial-gradient(circle, rgba(239,68,68,0.92) 0%, rgba(220,38,38,0.6) 60%, transparent 100%) !important;
+        }
+
+        .move-dot {
+            width: 28%;
+            height: 28%;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 50%;
+            pointer-events: none;
+            transition: transform 0.15s;
+            z-index: 3;
+        }
+
+        .square:hover .move-dot {
+            transform: scale(1.25);
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        .capture-ring {
+            width: 86%;
+            height: 86%;
+            border: 5px solid rgba(0, 0, 0, 0.28);
+            border-radius: 50%;
+            position: absolute;
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        .coord {
+            position: absolute;
+            font-size: 0.7rem;
+            font-weight: 800;
+            pointer-events: none;
+            font-family: sans-serif;
+            opacity: 0.85;
+        }
+        .square.light .coord { color: var(--board-dark); }
+        .square.dark .coord { color: var(--board-light); }
+        .coord-rank { top: 3px; left: 5px; }
+        .coord-file { bottom: 2px; right: 5px; }
+
+        .piece {
+            width: 85%;
+            height: 85%;
+            z-index: 2;
+            transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+            filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.4));
+            cursor: grab;
+        }
+
+        .piece:active {
+            cursor: grabbing;
+        }
+
+        .square:hover .piece {
+            transform: scale(1.04);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        select, button {
+            font-family: 'Cairo', sans-serif;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            padding: 9px 13px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        select {
+            background: rgba(15, 23, 42, 0.85);
+            color: var(--text-main);
+        }
+
+        select:hover { border-color: rgba(255,255,255,0.3); }
+
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.07);
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #eab308, #ca8a04);
+            color: #0f172a;
+            border: none;
+            grid-column: span 2;
+            font-size: 1rem;
+            box-shadow: 0 6px 20px rgba(234, 179, 8, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #facc15, #eab308) !important;
+        }
+
+        .status-banner {
+            background: rgba(15, 23, 42, 0.7);
+            border-right: 4px solid var(--accent);
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .thinking-indicator {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            color: #38bdf8;
+            font-size: 0.82rem;
+        }
+
+        .thinking-indicator.active { display: flex; }
+
+        .spinner {
+            width: 15px;
+            height: 15px;
+            border: 3px solid rgba(56, 189, 248, 0.3);
+            border-top-color: #38bdf8;
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .move-history {
+            height: 290px;
+            overflow-y: auto;
+            background: rgba(15, 23, 42, 0.55);
+            border-radius: 10px;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            direction: ltr;
+        }
+
+        .move-history::-webkit-scrollbar { width: 6px; }
+        .move-history::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+        .move-row {
+            display: grid;
+            grid-template-columns: 45px 1fr 1fr;
+            padding: 5px 8px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: monospace;
+        }
+
+        .move-row:nth-child(even) { background: rgba(255, 255, 255, 0.04); }
+        .move-num { color: var(--text-muted); }
+        .move-san { color: var(--text-main); font-weight: 600; }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(6px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .modal-overlay.show { display: flex; }
+
+        .modal-box {
+            background: #1e293b;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 26px;
+            text-align: center;
+            max-width: 430px;
+            width: 92%;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.8);
+            animation: popIn 0.22s ease;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.88); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .promotion-choices {
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+            margin-top: 20px;
+        }
+
+        .promo-btn {
+            width: 70px;
+            height: 70px;
+            background: rgba(255,255,255,0.08);
+            border: 2px solid rgba(255,255,255,0.15);
+            border-radius: 14px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .promo-btn:hover {
+            background: rgba(234, 179, 8, 0.25);
+            border-color: var(--accent);
+            transform: translateY(-4px);
+        }
+
+        .stats-box {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            background: rgba(0,0,0,0.25);
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .stats-box span {
+            color: var(--text-main);
+            font-weight: 700;
+        }
+
+        .footer-attribution {
+            margin-top: 14px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-align: center;
+            opacity: 0.75;
+        }
+        .footer-attribution a { color: var(--accent); text-decoration: none; }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- اللوحة اليمنى: الإعدادات والتحكم -->
+        <aside class="panel">
+            <div class="panel-header">
+                <div class="panel-title">👑 الشطرنج الملكي v2.0</div>
+            </div>
+
+            <div class="control-group">
+                <label>نمط اللعب:</label>
+                <select id="gameMode">
+                    <option value="ai">ضد الذكاء الاصطناعي (Web Worker AI)</option>
+                    <option value="pvp">لاعب ضد لاعب (نفس الجهاز)</option>
+                </select>
+            </div>
+
+            <div class="control-group" id="aiLevelGroup">
+                <label>قوة المحرك (Alpha-Beta + Quiescence):</label>
+                <select id="aiDepth">
+                    <option value="1">مستوى 1: مبتدئ (سريع)</option>
+                    <option value="2">مستوى 2: هاوٍ (تكتيكي خفيف)</option>
+                    <option value="3" selected>مستوى 3: متقدم (عمق 3 + هدوء)</option>
+                    <option value="4">مستوى 4: خبير (عمق 4 + هدوء كامل)</option>
+                </select>
+            </div>
+
+            <div class="control-group" id="playerColorGroup">
+                <label>اختر لون قطعك:</label>
+                <select id="playerColor">
+                    <option value="w" selected>الأبيض (يبدأ أولاً)</option>
+                    <option value="b">الأسود</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>الوقت لكل لاعب:</label>
+                <select id="timeControl">
+                    <option value="180">3 دقائق (Bullet)</option>
+                    <option value="300">5 دقائق (Blitz)</option>
+                    <option value="600" selected>10 دقائق (Rapid)</option>
+                    <option value="1800">30 دقيقة (Classical)</option>
+                    <option value="0">وقت مفتوح (بدون ساعة)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>مظهر الرقعة (Theme):</label>
+                <select id="boardTheme">
+                    <option value="classic">الزمردي الاحترافي</option>
+                    <option value="wood">الخشبي الكلاسيكي</option>
+                    <option value="ocean">المحيط الهادئ</option>
+                    <option value="cyber">الوضع الليلي (Cyber)</option>
+                </select>
+            </div>
+
+            <div class="btn-grid" style="margin-top: 4px;">
+                <button class="btn btn-primary" id="newGameBtn">🔄 بدء مباراة جديدة</button>
+                <button class="btn" id="undoBtn" title="تراجع عن النقلة">↩️ تراجع</button>
+                <button class="btn" id="hintBtn" title="اقترح أفضل نقلة">💡 تلميح ذكي</button>
+                <button class="btn" id="flipBtn" title="قلب اتجاه الرقعة">🔃 قلب الرقعة</button>
+                <button class="btn" id="soundBtn" title="كتم/تشغيل الصوت">🔊 الصوت: مفعل</button>
+            </div>
+
+            <div class="stats-box">
+                <div>العُقد المحللة: <span id="nodesCount">0</span></div>
+                <div>زمن البحث: <span id="thinkTime">0 ms</span></div>
+            </div>
+        </aside>
+
+        <!-- المنتصف: الرقعة وبطاقات اللاعبين -->
+        <main class="center-stage">
+            <div class="player-bar" id="topPlayerBar">
+                <div class="player-info">
+                    <div class="avatar ai-avatar" id="topAvatar">🤖</div>
+                    <div class="player-details">
+                        <h4 id="topName">محرك الذكاء الاصطناعي</h4>
+                        <div class="captured-area" id="topCaptured"></div>
+                    </div>
+                </div>
+                <div class="clock" id="topClock">10:00</div>
+            </div>
+
+            <div class="board-wrapper">
+                <div class="eval-bar-container" id="evalBarContainer" title="شريط تقييم الموقف">
+                    <div class="eval-black" id="evalBlackBar"></div>
+                    <div class="eval-white"></div>
+                    <div class="eval-score" id="evalScoreText">0.0</div>
+                </div>
+                <div class="chessboard" id="chessboard"></div>
+            </div>
+
+            <div class="player-bar active-turn" id="bottomPlayerBar">
+                <div class="player-info">
+                    <div class="avatar" id="bottomAvatar">👤</div>
+                    <div class="player-details">
+                        <h4 id="bottomName">أنت (الأبيض)</h4>
+                        <div class="captured-area" id="bottomCaptured"></div>
+                    </div>
+                </div>
+                <div class="clock" id="bottomClock">10:00</div>
+            </div>
+        </main>
+
+        <!-- اللوحة اليسرى: سجل النقلات والحالة -->
+        <aside class="panel">
+            <div class="panel-header">
+                <div class="panel-title">📜 سجل المباراة والتحليل</div>
+            </div>
+
+            <div class="status-banner">
+                <span id="statusText">دور الأبيض للعب</span>
+                <div class="thinking-indicator" id="aiThinking">
+                    <div class="spinner"></div>
+                    <span>يحسب...</span>
+                </div>
+            </div>
+
+            <div class="move-history" id="moveHistory"></div>
+
+            <div class="control-group" style="margin-top: auto;">
+                <label>نسخ وضعية الرقعة (FEN):</label>
+                <div style="display: flex; gap: 6px;">
+                    <input type="text" id="fenInput" readonly style="flex:1; background:rgba(0,0,0,0.3); border:1px solid var(--border-color); color:#cbd5e1; padding:8px; border-radius:8px; font-size:0.75rem; direction:ltr;">
+                    <button class="btn" id="copyFenBtn" style="padding: 8px 12px;">📋</button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <div class="footer-attribution">
+        تصميم القطع مبني على مجموعة <a href="https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces" target="_blank" rel="noopener">Colin M.L. Burnett (CC BY-SA 3.0)</a> • يعمل بمحرك Web Worker مع Quiescence Search.
+    </div>
+
+    <!-- نافذة ترقية البيدق -->
+    <div class="modal-overlay" id="promoModal">
+        <div class="modal-box">
+            <h3 style="color: var(--accent); margin-bottom: 8px;">👑 ترقية البيدق!</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">اختر القطعة التي تريد ترقية البيدق إليها:</p>
+            <div class="promotion-choices" id="promoChoices"></div>
+        </div>
+    </div>
+
+    <!-- نافذة نهاية المباراة مع زر مراجعة الرقعة -->
+    <div class="modal-overlay" id="gameOverModal">
+        <div class="modal-box">
+            <h2 id="gameOverTitle" style="color: var(--accent); font-size: 1.65rem; margin-bottom: 10px;">انتهت المباراة!</h2>
+            <p id="gameOverMessage" style="color: var(--text-main); font-size: 1rem; margin-bottom: 22px;"></p>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn" id="reviewBoardBtn" style="flex: 1;">🔍 مراجعة الرقعة</button>
+                <button class="btn btn-primary" id="playAgainBtn" style="flex: 1; grid-column: auto;">🏆 مباراة جديدة</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* =========================================================================
+           1. رسوميات قطع الشطرنج (مستوحاة من Cburnett CC BY-SA 3.0 مع تحسين الوضوح)
+           ========================================================================= */
+        const PIECE_SVGS = {
+            w: {
+                p: `<svg viewBox="0 0 45 45"><path d="M 22.5,9 C 19.5,9 17,11.5 17,14.5 C 17,16.8 18.4,18.7 20.4,19.5 C 17.5,21 15.5,24 15.5,29 L 29.5,29 C 29.5,24 27.5,21 24.6,19.5 C 26.6,18.7 28,16.8 28,14.5 C 28,11.5 25.5,9 22.5,9 z M 11.5,37 L 33.5,37 C 33.5,33.5 30,31 22.5,31 C 15,31 11.5,33.5 11.5,37 z" fill="#ffffff" stroke="#1e293b" stroke-width="2" stroke-linecap="round"/></svg>`,
+                r: `<svg viewBox="0 0 45 45"><g fill="#ffffff" stroke="#1e293b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 9,39 L 36,39 L 36,36 L 9,36 L 9,39 z M 12,36 L 12,32 L 33,32 L 33,36 L 12,36 z M 11,14 L 11,9 L 15,9 L 15,11 L 20,11 L 20,9 L 25,9 L 25,11 L 30,11 L 30,9 L 34,9 L 34,14"/><path d="M 34,14 L 31,17 L 14,17 L 11,14"/><path d="M 31,17 L 31,29.5 L 14,29.5 L 14,17"/><path d="M 14,29.5 L 12,32 L 33,32 L 31,29.5"/></g></svg>`,
+                n: `<svg viewBox="0 0 45 45"><g fill="#ffffff" stroke="#1e293b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 22,10 C 32.5,11 38.5,18 38,39 L 15,39 C 15,30 25,32.5 23,18"/><path d="M 24,18 C 24.38,20.91 18.45,25.37 16,27 C 13,29 13.18,31.34 11,31 C 9.958,30.06 12.41,27.96 11,28 C 10,28 11.19,29.23 10,30 C 9,30 5.997,31 6,26 C 6,24 12,14 12,14 C 12,14 13.89,12.1 14,10.5 C 13.27,9.506 13.5,8.5 13.5,7.5 C 14.5,6.5 16.5,10 16.5,10 L 18.5,10 C 18.5,10 19.28,8.008 21,7 C 22,7 22,10 22,10"/><circle cx="15.5" cy="14.5" r="1.2" fill="#1e293b"/></g></svg>`,
+                b: `<svg viewBox="0 0 45 45"><g fill="#ffffff" stroke="#1e293b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 9,36 C 12.39,35.03 19.11,36.43 22.5,34 C 25.89,36.43 32.61,35.03 36,36 C 36,36 37.65,36.54 39,38 C 38.32,38.97 37.35,38.99 36,38.5 C 32.61,37.53 25.89,38.96 22.5,37.5 C 19.11,38.96 12.39,37.53 9,38.5 C 7.646,38.99 6.677,38.97 6,38 C 7.354,36.06 9,36 9,36 z"/><path d="M 15,32 C 17.5,34.5 27.5,34.5 30,32 C 30.5,30.5 30,30 30,30 C 30,27.5 27.5,26 27.5,26 C 33,24.5 33.5,14.5 22.5,10.5 C 11.5,14.5 12,24.5 17.5,26 C 17.5,26 15,27.5 15,30 C 15,30 14.5,30.5 15,32 z"/><circle cx="22.5" cy="8" r="2.2"/><path d="M 17.5,26 L 27.5,26 M 15,30 L 30,30 M 22.5,15.5 L 22.5,20.5 M 20,18 L 25,18"/></g></svg>`,
+                q: `<svg viewBox="0 0 45 45"><g fill="#ffffff" stroke="#1e293b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 9,26 C 17.5,24.5 30,24.5 36,26 L 38.5,13.5 L 31,25 L 30.7,10.9 L 25.5,24.5 L 22.5,10 L 19.5,24.5 L 14.3,10.9 L 14,25 L 6.5,13.5 L 9,26 z"/><path d="M 9,26 C 9,28 10.5,28 11.5,30 C 12.5,31.5 12.5,31 12,33.5 C 10.5,34.5 11,36 11,36 C 9.5,37.5 11,38.5 11,38.5 C 17.5,39.5 27.5,39.5 34,38.5 C 34,38.5 35.5,37.5 34,36 C 34,36 34.5,34.5 33,33.5 C 32.5,31 32.5,31.5 33.5,30 C 34.5,28 36,28 36,26 C 27.5,24.5 17.5,24.5 9,26 z"/><circle cx="6" cy="12" r="1.8"/><circle cx="14" cy="9" r="1.8"/><circle cx="22.5" cy="8" r="1.8"/><circle cx="31" cy="9" r="1.8"/><circle cx="39" cy="12" r="1.8"/></g></svg>`,
+                k: `<svg viewBox="0 0 45 45"><g fill="#ffffff" stroke="#1e293b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 22.5,11.63 L 22.5,6 M 20,8 L 25,8"/><path d="M 22.5,25 C 22.5,25 27,17.5 25.5,14.5 C 25.5,14.5 24.5,12 22.5,12 C 20.5,12 19.5,14.5 19.5,14.5 C 18,17.5 22.5,25 22.5,25"/><path d="M 11.5,37 C 17,40.5 27,40.5 32.5,37 L 32.5,30 C 32.5,30 41.5,25.5 38.5,19.5 C 34.5,13 25,16 22.5,23.5 L 22.5,27 L 22.5,23.5 C 19,16 9.5,13 6.5,19.5 C 3.5,25.5 11.5,29.5 11.5,29.5 L 11.5,37 z"/><path d="M 11.5,30 C 17,27 27,27 32.5,30 M 11.5,33.5 C 17,30.5 27,30.5 32.5,33.5"/></g></svg>`
+            },
+            b: {
+                p: `<svg viewBox="0 0 45 45"><path d="M 22.5,9 C 19.5,9 17,11.5 17,14.5 C 17,16.8 18.4,18.7 20.4,19.5 C 17.5,21 15.5,24 15.5,29 L 29.5,29 C 29.5,24 27.5,21 24.6,19.5 C 26.6,18.7 28,16.8 28,14.5 C 28,11.5 25.5,9 22.5,9 z M 11.5,37 L 33.5,37 C 33.5,33.5 30,31 22.5,31 C 15,31 11.5,33.5 11.5,37 z" fill="#1e293b" stroke="#e2e8f0" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+                r: `<svg viewBox="0 0 45 45"><g fill="#1e293b" stroke="#e2e8f0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M 9,39 L 36,39 L 36,36 L 9,36 L 9,39 z M 12,36 L 12,32 L 33,32 L 33,36 L 12,36 z M 11,14 L 11,9 L 15,9 L 15,11 L 20,11 L 20,9 L 25,9 L 25,11 L 30,11 L 30,9 L 34,9 L 34,14"/><path d="M 34,14 L 31,17 L 14,17 L 11,14"/><path d="M 31,17 L 31,29.5 L 14,29.5 L 14,17"/><path d="M 14,29.5 L 12,32 L 33,32 L 31,29.5"/></g></svg>`,
+                n: `<svg viewBox="0 0 45 45"><g fill="#1e293b" stroke="#e2e8f0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M 22,10 C 32.5,11 38.5,18 38,39 L 15,39 C 15,30 25,32.5 23,18"/><path d="M 24,18 C 24.38,20.91 18.45,25.37 16,27 C 13,29 13.18,31.34 11,31 C 9.958,30.06 12.41,27.96 11,28 C 10,28 11.19,29.23 10,30 C 9,30 5.997,31 6,26 C 6,24 12,14 12,14 C 12,14 13.89,12.1 14,10.5 C 13.27,9.506 13.5,8.5 13.5,7.5 C 14.5,6.5 16.5,10 16.5,10 L 18.5,10 C 18.5,10 19.28,8.008 21,7 C 22,7 22,10 22,10"/><circle cx="15.5" cy="14.5" r="1.2" fill="#e2e8f0"/></g></svg>`,
+                b: `<svg viewBox="0 0 45 45"><g fill="#1e293b" stroke="#e2e8f0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M 9,36 C 12.39,35.03 19.11,36.43 22.5,34 C 25.89,36.43 32.61,35.03 36,36 C 36,36 37.65,36.54 39,38 C 38.32,38.97 37.35,38.99 36,38.5 C 32.61,37.53 25.89,38.96 22.5,37.5 C 19.11,38.96 12.39,37.53 9,38.5 C 7.646,38.99 6.677,38.97 6,38 C 7.354,36.06 9,36 9,36 z"/><path d="M 15,32 C 17.5,34.5 27.5,34.5 30,32 C 30.5,30.5 30,30 30,30 C 30,27.5 27.5,26 27.5,26 C 33,24.5 33.5,14.5 22.5,10.5 C 11.5,14.5 12,24.5 17.5,26 C 17.5,26 15,27.5 15,30 C 15,30 14.5,30.5 15,32 z"/><circle cx="22.5" cy="8" r="2.2"/><path d="M 17.5,26 L 27.5,26 M 15,30 L 30,30 M 22.5,15.5 L 22.5,20.5 M 20,18 L 25,18"/></g></svg>`,
+                q: `<svg viewBox="0 0 45 45"><g fill="#1e293b" stroke="#e2e8f0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M 9,26 C 17.5,24.5 30,24.5 36,26 L 38.5,13.5 L 31,25 L 30.7,10.9 L 25.5,24.5 L 22.5,10 L 19.5,24.5 L 14.3,10.9 L 14,25 L 6.5,13.5 L 9,26 z"/><path d="M 9,26 C 9,28 10.5,28 11.5,30 C 12.5,31.5 12.5,31 12,33.5 C 10.5,34.5 11,36 11,36 C 9.5,37.5 11,38.5 11,38.5 C 17.5,39.5 27.5,39.5 34,38.5 C 34,38.5 35.5,37.5 34,36 C 34,36 34.5,34.5 33,33.5 C 32.5,31 32.5,31.5 33.5,30 C 34.5,28 36,28 36,26 C 27.5,24.5 17.5,24.5 9,26 z"/><circle cx="6" cy="12" r="1.8"/><circle cx="14" cy="9" r="1.8"/><circle cx="22.5" cy="8" r="1.8"/><circle cx="31" cy="9" r="1.8"/><circle cx="39" cy="12" r="1.8"/></g></svg>`,
+                k: `<svg viewBox="0 0 45 45"><g fill="#1e293b" stroke="#e2e8f0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M 22.5,11.63 L 22.5,6 M 20,8 L 25,8"/><path d="M 22.5,25 C 22.5,25 27,17.5 25.5,14.5 C 25.5,14.5 24.5,12 22.5,12 C 20.5,12 19.5,14.5 19.5,14.5 C 18,17.5 22.5,25 22.5,25"/><path d="M 11.5,37 C 17,40.5 27,40.5 32.5,37 L 32.5,30 C 32.5,30 41.5,25.5 38.5,19.5 C 34.5,13 25,16 22.5,23.5 L 22.5,27 L 22.5,23.5 C 19,16 9.5,13 6.5,19.5 C 3.5,25.5 11.5,29.5 11.5,29.5 L 11.5,37 z"/><path d="M 11.5,30 C 17,27 27,27 32.5,30 M 11.5,33.5 C 17,30.5 27,30.5 32.5,33.5"/></g></svg>`
+            }
+        };
+
+        /* =========================================================================
+           2. مولد المؤثرات الصوتية البرمجي مع دعم استئناف AudioContext المعلّق
+           ========================================================================= */
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+            playTone(freq, type, duration, gainVal = 0.15) {
+                if (!this.enabled) return;
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {}
+            }
+            move() { this.playTone(240, 'triangle', 0.09, 0.2); }
+            capture() {
+                this.playTone(150, 'sawtooth', 0.12, 0.25);
+                setTimeout(() => this.playTone(110, 'triangle', 0.1, 0.2), 40);
+            }
+            check() {
+                this.playTone(580, 'sine', 0.18, 0.25);
+                setTimeout(() => this.playTone(880, 'sine', 0.25, 0.25), 90);
+            }
+            gameOver() {
+                [440, 554, 659, 880].forEach((f, idx) => {
+                    setTimeout(() => this.playTone(f, 'triangle', 0.3, 0.2), idx * 110);
+                });
+            }
+        }
+        const sound = new SoundEngine();
+
+        /* =========================================================================
+           3. كود محرك الذكاء الاصطناعي داخل Web Worker مستقل
+              (يشتمل على: التقييم السريع، PST للنهايات، Quiescence Search، وتقليم الجذر)
+           ========================================================================= */
+        const WORKER_CODE = `
+            importScripts('https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js');
+
+            const PIECE_VALUES = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+
+            const PST = {
+                p: [
+                    [0,  0,  0,  0,  0,  0,  0,  0],
+                    [50, 50, 50, 50, 50, 50, 50, 50],
+                    [10, 10, 20, 30, 30, 20, 10, 10],
+                    [5,  5, 10, 25, 25, 10,  5,  5],
+                    [0,  0,  0, 20, 20,  0,  0,  0],
+                    [5, -5,-10,  0,  0,-10, -5,  5],
+                    [5, 10, 10,-20,-20, 10, 10,  5],
+                    [0,  0,  0,  0,  0,  0,  0,  0]
+                ],
+                n: [
+                    [-50,-40,-30,-30,-30,-30,-40,-50],
+                    [-40,-20,  0,  0,  0,  0,-20,-40],
+                    [-30,  0, 10, 15, 15, 10,  0,-30],
+                    [-30,  5, 15, 20, 20, 15,  5,-30],
+                    [-30,  0, 15, 20, 20, 15,  0,-30],
+                    [-30,  5, 10, 15, 15, 10,  5,-30],
+                    [-40,-20,  0,  5,  5,  0,-20,-40],
+                    [-50,-40,-30,-30,-30,-30,-40,-50]
+                ],
+                b: [
+                    [-20,-10,-10,-10,-10,-10,-10,-20],
+                    [-10,  0,  0,  0,  0,  0,  0,-10],
+                    [-10,  0,  5, 10, 10,  5,  0,-10],
+                    [-10,  5,  5, 10, 10,  5,  5,-10],
+                    [-10,  0, 10, 10, 10, 10,  0,-10],
+                    [-10, 10, 10, 10, 10, 10, 10,-10],
+                    [-10,  5,  0,  0,  0,  0,  5,-10],
+                    [-20,-10,-10,-10,-10,-10,-10,-20]
+                ],
+                r: [
+                    [0,  0,  0,  0,  0,  0,  0,  0],
+                    [5, 10, 10, 10, 10, 10, 10,  5],
+                    [-5,  0,  0,  0,  0,  0,  0, -5],
+                    [-5,  0,  0,  0,  0,  0,  0, -5],
+                    [-5,  0,  0,  0,  0,  0,  0, -5],
+                    [-5,  0,  0,  0,  0,  0,  0, -5],
+                    [-5,  0,  0,  0,  0,  0,  0, -5],
+                    [0,  0,  0,  5,  5,  0,  0,  0]
+                ],
+                q: [
+                    [-20,-10,-10, -5, -5,-10,-10,-20],
+                    [-10,  0,  0,  0,  0,  0,  0,-10],
+                    [-10,  0,  5,  5,  5,  5,  0,-10],
+                    [-5,  0,  5,  5,  5,  5,  0, -5],
+                    [0,  0,  5,  5,  5,  5,  0, -5],
+                    [-10,  5,  5,  5,  5,  5,  0,-10],
+                    [-10,  0,  5,  0,  0,  0,  0,-10],
+                    [-20,-10,-10, -5, -5,-10,-10,-20]
+                ],
+                k_mid: [
+                    [-30,-40,-40,-50,-50,-40,-40,-30],
+                    [-30,-40,-40,-50,-50,-40,-40,-30],
+                    [-30,-40,-40,-50,-50,-40,-40,-30],
+                    [-30,-40,-40,-50,-50,-40,-40,-30],
+                    [-20,-30,-30,-40,-40,-30,-30,-20],
+                    [-10,-20,-20,-20,-20,-20,-20,-10],
+                    [20, 20,  0,  0,  0,  0, 20, 20],
+                    [20, 30, 10,  0,  0, 10, 30, 20]
+                ],
+                k_end: [
+                    [-50,-40,-30,-20,-20,-30,-40,-50],
+                    [-30,-20,-10,  0,  0,-10,-20,-30],
+                    [-30,-10, 20, 30, 30, 20,-10,-30],
+                    [-30,-10, 30, 40, 40, 30,-10,-30],
+                    [-30,-10, 30, 40, 40, 30,-10,-30],
+                    [-30,-10, 20, 30, 30, 20,-10,-30],
+                    [-30,-30,  0,  0,  0,  0,-30,-30],
+                    [-50,-30,-30,-30,-30,-30,-30,-50]
+                ]
+            };
+
+            let nodesEvaluated = 0;
+
+            // تقييم سريع جداً بدون استدعاءات in_draw أو in_threefold_repetition المكلفة
+            function evaluateFast(g) {
+                const board = g.board();
+                let whiteMat = 0, blackMat = 0;
+                let nonPawnMaterial = 0;
+
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const p = board[r][c];
+                        if (p && p.type !== 'k' && p.type !== 'p') {
+                            nonPawnMaterial += PIECE_VALUES[p.type];
+                        }
+                    }
+                }
+
+                // تحديد ما إذا كنا في مرحلة النهايات (Endgame) لتفعيل جدول الملك الهجومي
+                const isEndgame = nonPawnMaterial <= 2600;
+                let totalScore = 0;
+
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const piece = board[r][c];
+                        if (!piece) continue;
+
+                        const baseVal = PIECE_VALUES[piece.type];
+                        const pstRow = piece.color === 'w' ? r : 7 - r;
+                        let posVal = 0;
+
+                        if (piece.type === 'k') {
+                            posVal = isEndgame ? PST.k_end[pstRow][c] : PST.k_mid[pstRow][c];
+                        } else {
+                            posVal = PST[piece.type][pstRow][c];
+                        }
+
+                        if (piece.color === 'w') totalScore += baseVal + posVal;
+                        else totalScore -= (baseVal + posVal);
+                    }
+                }
+                return totalScore;
+            }
+
+            function orderMoves(moves) {
+                return moves.sort((a, b) => {
+                    let scoreA = 0, scoreB = 0;
+                    if (a.captured) scoreA += 10 * PIECE_VALUES[a.captured] - PIECE_VALUES[a.piece];
+                    if (a.promotion) scoreA += PIECE_VALUES[a.promotion];
+                    if (b.captured) scoreB += 10 * PIECE_VALUES[b.captured] - PIECE_VALUES[b.piece];
+                    if (b.promotion) scoreB += PIECE_VALUES[b.promotion];
+                    return scoreB - scoreA;
+                });
+            }
+
+            // Quiescence Search لتجنب تأثير الأفق (Horizon Effect)
+            function quiescence(g, alpha, beta, isMax, qDepth = 0) {
+                nodesEvaluated++;
+                const standPat = evaluateFast(g);
+
+                if (qDepth >= 4) return standPat;
+
+                if (isMax) {
+                    if (standPat >= beta) return beta;
+                    if (alpha < standPat) alpha = standPat;
+                } else {
+                    if (standPat <= alpha) return alpha;
+                    if (beta > standPat) beta = standPat;
+                }
+
+                // نبحث فقط في نقلات الأكل والترقيات
+                const tacticalMoves = orderMoves(
+                    g.moves({ verbose: true }).filter(m => m.captured || m.promotion)
+                );
+
+                if (isMax) {
+                    for (const m of tacticalMoves) {
+                        g.move(m);
+                        const score = quiescence(g, alpha, beta, false, qDepth + 1);
+                        g.undo();
+                        if (score >= beta) return beta;
+                        if (score > alpha) alpha = score;
+                    }
+                    return alpha;
+                } else {
+                    for (const m of tacticalMoves) {
+                        g.move(m);
+                        const score = quiescence(g, alpha, beta, true, qDepth + 1);
+                        g.undo();
+                        if (score <= alpha) return alpha;
+                        if (score < beta) beta = score;
+                    }
+                    return beta;
+                }
+            }
+
+            function minimax(g, depth, alpha, beta, isMax, useQuiescence) {
+                nodesEvaluated++;
+                const moves = g.moves({ verbose: true });
+
+                // كشف الكش مات والتعادل بسرعة فائقة من عدد النقلات المتاحة
+                if (moves.length === 0) {
+                    return g.in_check() ? (isMax ? -(99999 + depth) : (99999 + depth)) : 0;
+                }
+
+                if (depth === 0) {
+                    return useQuiescence ? quiescence(g, alpha, beta, isMax, 0) : evaluateFast(g);
+                }
+
+                const ordered = orderMoves(moves);
+
+                if (isMax) {
+                    let maxEval = -Infinity;
+                    for (const m of ordered) {
+                        g.move(m);
+                        const ev = minimax(g, depth - 1, alpha, beta, false, useQuiescence);
+                        g.undo();
+                        if (ev > maxEval) maxEval = ev;
+                        if (ev > alpha) alpha = ev;
+                        if (beta <= alpha) break;
+                    }
+                    return maxEval;
+                } else {
+                    let minEval = Infinity;
+                    for (const m of ordered) {
+                        g.move(m);
+                        const ev = minimax(g, depth - 1, alpha, beta, true, useQuiescence);
+                        g.undo();
+                        if (ev < minEval) minEval = ev;
+                        if (ev < beta) beta = ev;
+                        if (beta <= alpha) break;
+                    }
+                    return minEval;
+                }
+            }
+
+            self.onmessage = function(e) {
+                const { fen, depth, reqType } = e.data;
+                const g = new Chess(fen);
+                nodesEvaluated = 0;
+                const t0 = performance.now();
+
+                const isMax = g.turn() === 'w';
+                const moves = orderMoves(g.moves({ verbose: true }));
+                const useQuiescence = depth >= 2;
+
+                let bestMove = moves[0];
+                let bestVal = isMax ? -Infinity : Infinity;
+                let alpha = -Infinity;
+                let beta = Infinity;
+
+                for (const m of moves) {
+                    g.move(m);
+                    // إذا كانت النقلة تؤدي للتكرار الثلاثي نتجنبها إن كنا متقدمين
+                    const ev = minimax(g, depth - 1, alpha, beta, !isMax, useQuiescence);
+                    g.undo();
+
+                    // إضافة عشوائية طفيفة جداً (±4 سنتي بيدق) لكسر الحتمية بين النقلات المتكافئة
+                    const jitter = (Math.random() - 0.5) * 8;
+                    const noisyEv = ev + jitter;
+
+                    if (isMax) {
+                        if (noisyEv > bestVal) {
+                            bestVal = noisyEv;
+                            bestMove = m;
+                        }
+                        if (bestVal > alpha) alpha = bestVal;
+                    } else {
+                        if (noisyEv < bestVal) {
+                            bestVal = noisyEv;
+                            bestMove = m;
+                        }
+                        if (bestVal < beta) beta = bestVal;
+                    }
+                }
+
+                const elapsed = Math.round(performance.now() - t0);
+                self.postMessage({
+                    reqType,
+                    bestMove,
+                    nodesEvaluated,
+                    elapsed,
+                    evalScore: evaluateFast(g)
+                });
+            };
+        `;
+
+        /* =========================================================================
+           4. إدارة حالة اللعبة، الـ Web Worker، والسحب والإفلات
+           ========================================================================= */
+        const game = new Chess();
+        const PIECE_VALUES_MAIN = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+
+        let aiWorker = null;
+        let isAIThinking = false;
+        let isGameOverByClock = false;
+
+        let selectedSquare = null;
+        let legalMovesForSelected = [];
+        let lastMove = null;
+        let hintMove = null;
+        let isBoardFlipped = false;
+        let pendingPromotionMove = null;
+        let draggedFromSquare = null;
+
+        // مؤقت زمني دقيق بالمللي ثانية
+        let whiteTimeMs = 600000;
+        let blackTimeMs = 600000;
+        let lastTickTimestamp = null;
+        let timerInterval = null;
+
+        const boardEl = document.getElementById('chessboard');
+
+        function createOrResetWorker() {
+            if (aiWorker) {
+                aiWorker.terminate();
+            }
+            const blob = new Blob([WORKER_CODE], { type: 'application/javascript' });
+            aiWorker = new Worker(URL.createObjectURL(blob));
+
+            aiWorker.onmessage = function(e) {
+                const { reqType, bestMove, nodesEvaluated, elapsed } = e.data;
+                document.getElementById('nodesCount').textContent = nodesEvaluated.toLocaleString();
+                document.getElementById('thinkTime').textContent = `${elapsed} ms`;
+
+                isAIThinking = false;
+                document.getElementById('aiThinking').classList.remove('active');
+
+                if (isGameOver() || !bestMove) return;
+
+                if (reqType === 'hint') {
+                    hintMove = { from: bestMove.from, to: bestMove.to };
+                    renderBoard();
+                } else if (reqType === 'aiMove') {
+                    executeMove(bestMove);
+                }
+            };
+        }
+
+        function isGameOver() {
+            return isGameOverByClock || game.game_over();
+        }
+
+        function initGame() {
+            createOrResetWorker();
+            isAIThinking = false;
+            isGameOverByClock = false;
+            document.getElementById('aiThinking').classList.remove('active');
+            document.getElementById('gameOverModal').classList.remove('show');
+
+            game.reset();
+            selectedSquare = null;
+            legalMovesForSelected = [];
+            lastMove = null;
+            hintMove = null;
+
+            const mode = document.getElementById('gameMode').value;
+            const userColor = document.getElementById('playerColor').value;
+            isBoardFlipped = (mode === 'ai' && userColor === 'b');
+
+            syncEvalBarOrientation();
+
+            const initialSeconds = parseInt(document.getElementById('timeControl').value, 10);
+            whiteTimeMs = initialSeconds * 1000;
+            blackTimeMs = initialSeconds * 1000;
+            startClock();
+
+            updatePlayerHeaders();
+            renderBoard();
+            updateUI();
+
+            if (mode === 'ai' && userColor === 'b') {
+                triggerAIMove();
+            }
+        }
+
+        function syncEvalBarOrientation() {
+            const evalContainer = document.getElementById('evalBarContainer');
+            evalContainer.classList.toggle('flipped', isBoardFlipped);
+        }
+
+        function updatePlayerHeaders() {
+            const mode = document.getElementById('gameMode').value;
+            const userColor = document.getElementById('playerColor').value;
+            const aiSelect = document.getElementById('aiDepth');
+            const aiTitle = aiSelect.options[aiSelect.selectedIndex].text.split(':')[0];
+
+            const topName = document.getElementById('topName');
+            const bottomName = document.getElementById('bottomName');
+            const topAvatar = document.getElementById('topAvatar');
+            const bottomAvatar = document.getElementById('bottomAvatar');
+
+            if (mode === 'pvp') {
+                topName.textContent = isBoardFlipped ? 'اللاعب 1 (الأبيض)' : 'اللاعب 2 (الأسود)';
+                bottomName.textContent = isBoardFlipped ? 'اللاعب 2 (الأسود)' : 'اللاعب 1 (الأبيض)';
+                topAvatar.textContent = '👤';
+                bottomAvatar.textContent = '👤';
+            } else {
+                const topIsWhite = isBoardFlipped;
+                if (topIsWhite) {
+                    topName.textContent = userColor === 'w' ? 'أنت (الأبيض)' : `الذكاء الاصطناعي (${aiTitle})`;
+                    bottomName.textContent = userColor === 'b' ? 'أنت (الأسود)' : `الذكاء الاصطناعي (${aiTitle})`;
+                    topAvatar.textContent = userColor === 'w' ? '👤' : '🤖';
+                    bottomAvatar.textContent = userColor === 'b' ? '👤' : '🤖';
+                } else {
+                    topName.textContent = userColor === 'b' ? 'أنت (الأسود)' : `الذكاء الاصطناعي (${aiTitle})`;
+                    bottomName.textContent = userColor === 'w' ? 'أنت (الأبيض)' : `الذكاء الاصطناعي (${aiTitle})`;
+                    topAvatar.textContent = userColor === 'b' ? '👤' : '🤖';
+                    bottomAvatar.textContent = userColor === 'w' ? '👤' : '🤖';
+                }
+            }
+        }
+
+        function canHumanMovePieceAt(sqName) {
+            if (isGameOver() || isAIThinking) return false;
+            const piece = game.get(sqName);
+            if (!piece || piece.color !== game.turn()) return false;
+
+            const mode = document.getElementById('gameMode').value;
+            const userColor = document.getElementById('playerColor').value;
+            if (mode === 'ai' && game.turn() !== userColor) return false;
+            return true;
+        }
+
+        function renderBoard() {
+            boardEl.innerHTML = '';
+            const boardState = game.board();
+            const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+            const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
+
+            const rowIndices = isBoardFlipped ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
+            const colIndices = isBoardFlipped ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
+
+            for (let rIdx = 0; rIdx < 8; rIdx++) {
+                for (let cIdx = 0; cIdx < 8; cIdx++) {
+                    const r = rowIndices[rIdx];
+                    const c = colIndices[cIdx];
+                    const sqName = files[c] + ranks[r];
+                    const isLight = (r + c) % 2 === 0;
+
+                    const sqDiv = document.createElement('div');
+                    sqDiv.className = `square ${isLight ? 'light' : 'dark'}`;
+                    sqDiv.dataset.square = sqName;
+
+                    if (selectedSquare === sqName) sqDiv.classList.add('selected');
+                    if (lastMove && (lastMove.from === sqName || lastMove.to === sqName)) {
+                        sqDiv.classList.add('last-move');
+                    }
+                    if (hintMove && (hintMove.from === sqName || hintMove.to === sqName)) {
+                        sqDiv.classList.add('hint-square');
+                    }
+
+                    if (cIdx === 0) {
+                        const rankLabel = document.createElement('span');
+                        rankLabel.className = 'coord coord-rank';
+                        rankLabel.textContent = ranks[r];
+                        sqDiv.appendChild(rankLabel);
+                    }
+                    if (rIdx === 7) {
+                        const fileLabel = document.createElement('span');
+                        fileLabel.className = 'coord coord-file';
+                        fileLabel.textContent = files[c];
+                        sqDiv.appendChild(fileLabel);
+                    }
+
+                    const piece = boardState[r][c];
+                    if (piece) {
+                        const pieceDiv = document.createElement('div');
+                        pieceDiv.className = 'piece';
+                        pieceDiv.innerHTML = PIECE_SVGS[piece.color][piece.type];
+
+                        // تفعيل السحب والإفلات للقطع المسموح تحريكها
+                        if (canHumanMovePieceAt(sqName)) {
+                            pieceDiv.draggable = true;
+                            pieceDiv.addEventListener('dragstart', (e) => {
+                                draggedFromSquare = sqName;
+                                selectedSquare = sqName;
+                                legalMovesForSelected = game.moves({ square: sqName, verbose: true });
+                                e.dataTransfer.setData('text/plain', sqName);
+                                // تأخير بسيط لإظهار دوائر الحركة دون إخفاء صورة السحب
+                                setTimeout(() => highlightLegalSquaresInDOM(), 10);
+                            });
+                        }
+
+                        sqDiv.appendChild(pieceDiv);
+
+                        if (piece.type === 'k' && piece.color === game.turn() && game.in_check()) {
+                            sqDiv.classList.add('in-check');
+                        }
+                    }
+
+                    const legalMove = legalMovesForSelected.find(m => m.to === sqName);
+                    if (legalMove) {
+                        const indicator = document.createElement('div');
+                        indicator.className = (piece || legalMove.flags.includes('e')) ? 'capture-ring' : 'move-dot';
+                        sqDiv.appendChild(indicator);
+                    }
+
+                    // أحداث الإفلات والنقر على المربعات
+                    sqDiv.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        sqDiv.classList.add('drag-over');
+                    });
+                    sqDiv.addEventListener('dragleave', () => {
+                        sqDiv.classList.remove('drag-over');
+                    });
+                    sqDiv.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        sqDiv.classList.remove('drag-over');
+                        if (draggedFromSquare && draggedFromSquare !== sqName) {
+                            onSquareClick(sqName);
+                        }
+                        draggedFromSquare = null;
+                    });
+
+                    sqDiv.addEventListener('click', () => onSquareClick(sqName));
+                    boardEl.appendChild(sqDiv);
+                }
+            }
+        }
+
+        function highlightLegalSquaresInDOM() {
+            document.querySelectorAll('.square').forEach(sqEl => {
+                const sq = sqEl.dataset.square;
+                if (sq === selectedSquare) sqEl.classList.add('selected');
+                const legalMove = legalMovesForSelected.find(m => m.to === sq);
+                if (legalMove && !sqEl.querySelector('.move-dot, .capture-ring')) {
+                    const hasPiece = game.get(sq);
+                    const ind = document.createElement('div');
+                    ind.className = (hasPiece || legalMove.flags.includes('e')) ? 'capture-ring' : 'move-dot';
+                    sqEl.appendChild(ind);
+                }
+            });
+        }
+
+        function onSquareClick(sqName) {
+            if (isGameOver() || isAIThinking) return;
+
+            const mode = document.getElementById('gameMode').value;
+            const userColor = document.getElementById('playerColor').value;
+            if (mode === 'ai' && game.turn() !== userColor) return;
+
+            const moveObj = legalMovesForSelected.find(m => m.to === sqName);
+            if (moveObj) {
+                if (moveObj.flags.includes('p')) {
+                    showPromotionModal(moveObj.from, moveObj.to);
+                } else {
+                    executeMove({ from: moveObj.from, to: moveObj.to });
+                }
+                return;
+            }
+
+            const piece = game.get(sqName);
+            if (piece && piece.color === game.turn()) {
+                selectedSquare = sqName;
+                legalMovesForSelected = game.moves({ square: sqName, verbose: true });
+            } else {
+                selectedSquare = null;
+                legalMovesForSelected = [];
+            }
+            renderBoard();
+        }
+
+        function showPromotionModal(from, to) {
+            pendingPromotionMove = { from, to };
+            const modal = document.getElementById('promoModal');
+            const choicesDiv = document.getElementById('promoChoices');
+            choicesDiv.innerHTML = '';
+
+            const turnColor = game.turn();
+            ['q', 'r', 'b', 'n'].forEach(type => {
+                const btn = document.createElement('div');
+                btn.className = 'promo-btn';
+                btn.innerHTML = PIECE_SVGS[turnColor][type];
+                btn.onclick = () => {
+                    modal.classList.remove('show');
+                    executeMove({ from: pendingPromotionMove.from, to: pendingPromotionMove.to, promotion: type });
+                    pendingPromotionMove = null;
+                };
+                choicesDiv.appendChild(btn);
+            });
+
+            modal.classList.add('show');
+        }
+
+        function executeMove(moveData) {
+            const moveResult = game.move(moveData);
+            if (!moveResult) return;
+
+            selectedSquare = null;
+            legalMovesForSelected = [];
+            lastMove = { from: moveResult.from, to: moveResult.to };
+            hintMove = null;
+            lastTickTimestamp = performance.now();
+
+            if (game.game_over()) {
+                sound.gameOver();
+            } else if (game.in_check()) {
+                sound.check();
+            } else if (moveResult.captured) {
+                sound.capture();
+            } else {
+                sound.move();
+            }
+
+            renderBoard();
+            updateUI();
+
+            const mode = document.getElementById('gameMode').value;
+            const userColor = document.getElementById('playerColor').value;
+            if (!isGameOver() && mode === 'ai' && game.turn() !== userColor) {
+                triggerAIMove();
+            }
+        }
+
+        function triggerAIMove() {
+            if (isGameOver()) return;
+            isAIThinking = true;
+            document.getElementById('aiThinking').classList.add('active');
+
+            const depth = parseInt(document.getElementById('aiDepth').value, 10);
+            aiWorker.postMessage({
+                reqType: 'aiMove',
+                fen: game.fen(),
+                depth
+            });
+        }
+
+        /* =========================================================================
+           5. التقييم المحلي السريع للواجهة وتحديث الأشرطة والسجل
+           ========================================================================= */
+        function evaluateForUI() {
+            if (game.in_checkmate()) {
+                return game.turn() === 'w' ? -9999 : 9999;
+            }
+            if (game.in_draw()) return 0;
+
+            const board = game.board();
+            let score = 0;
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = board[r][c];
+                    if (!p) continue;
+                    const val = PIECE_VALUES_MAIN[p.type];
+                    score += (p.color === 'w' ? val : -val);
+                }
+            }
+            return score;
+        }
+
+        function updateUI() {
+            const statusEl = document.getElementById('statusText');
+            const turnName = game.turn() === 'w' ? 'الأبيض' : 'الأسود';
+
+            if (game.in_checkmate()) {
+                const winner = game.turn() === 'w' ? 'الأسود' : 'الأبيض';
+                statusEl.textContent = `كش مات! فاز ${winner}`;
+                showGameOverModal('🏆 كش مات (Checkmate)!', `انتهت المباراة بفوز مستحق لصالح ${winner}.`);
+            } else if (game.in_draw()) {
+                let reason = 'تعادل!';
+                if (game.in_stalemate()) reason = 'تعادل بسبب الحصر (Stalemate)!';
+                else if (game.in_threefold_repetition()) reason = 'تعادل لتكرار الوضعية 3 مرات!';
+                else if (game.insufficient_material()) reason = 'تعادل لعدم كفاية القطع!';
+                statusEl.textContent = reason;
+                showGameOverModal('🤝 تعادل!', reason);
+            } else if (!isGameOverByClock) {
+                statusEl.textContent = `دور ${turnName} للعب` + (game.in_check() ? ' (كش ملك! ⚠️)' : '');
+            }
+
+            const topColor = isBoardFlipped ? 'w' : 'b';
+            document.getElementById('topPlayerBar').classList.toggle('active-turn', game.turn() === topColor && !isGameOver());
+            document.getElementById('bottomPlayerBar').classList.toggle('active-turn', game.turn() !== topColor && !isGameOver());
+
+            const rawScore = evaluateForUI() / 100;
+            const displayScore = rawScore > 0 ? `+${rawScore.toFixed(1)}` : rawScore.toFixed(1);
+            document.getElementById('evalScoreText').textContent = Math.abs(rawScore) > 50 ? 'M' : displayScore;
+
+            const clamped = Math.max(-10, Math.min(10, rawScore));
+            const blackPercentage = 50 - (clamped * 4.5);
+            document.getElementById('evalBlackBar').style.height = `${blackPercentage}%`;
+
+            document.getElementById('fenInput').value = game.fen();
+
+            updateCapturedPieces();
+            updateMoveHistory();
+        }
+
+        function updateCapturedPieces() {
+            const startCounts = { p: 8, n: 2, b: 2, r: 2, q: 1 };
+            const currentCounts = { w: { p: 0, n: 0, b: 0, r: 0, q: 0 }, b: { p: 0, n: 0, b: 0, r: 0, q: 0 } };
+
+            const board = game.board();
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = board[r][c];
+                    if (p && p.type !== 'k') currentCounts[p.color][p.type]++;
+                }
+            }
+
+            const capturedByWhite = [];
+            const capturedByBlack = [];
+            let whiteMat = 0, blackMat = 0;
+
+            ['q', 'r', 'b', 'n', 'p'].forEach(type => {
+                whiteMat += currentCounts.w[type] * (PIECE_VALUES_MAIN[type] / 100);
+                blackMat += currentCounts.b[type] * (PIECE_VALUES_MAIN[type] / 100);
+
+                const missingBlack = Math.max(0, startCounts[type] - currentCounts.b[type]);
+                for (let i = 0; i < missingBlack; i++) capturedByWhite.push(PIECE_SVGS.b[type]);
+
+                const missingWhite = Math.max(0, startCounts[type] - currentCounts.w[type]);
+                for (let i = 0; i < missingWhite; i++) capturedByBlack.push(PIECE_SVGS.w[type]);
+            });
+
+            const diff = Math.round(whiteMat - blackMat);
+            const whiteHTML = capturedByWhite.map(svg => `<div class="captured-piece">${svg}</div>`).join('') +
+                              (diff > 0 ? `<span class="material-badge">+${diff}</span>` : '');
+            const blackHTML = capturedByBlack.map(svg => `<div class="captured-piece">${svg}</div>`).join('') +
+                              (diff < 0 ? `<span class="material-badge">+${Math.abs(diff)}</span>` : '');
+
+            if (isBoardFlipped) {
+                document.getElementById('topCaptured').innerHTML = whiteHTML;
+                document.getElementById('bottomCaptured').innerHTML = blackHTML;
+            } else {
+                document.getElementById('topCaptured').innerHTML = blackHTML;
+                document.getElementById('bottomCaptured').innerHTML = whiteHTML;
+            }
+        }
+
+        function updateMoveHistory() {
+            const historyEl = document.getElementById('moveHistory');
+            const moves = game.history();
+            historyEl.innerHTML = '';
+
+            for (let i = 0; i < moves.length; i += 2) {
+                const row = document.createElement('div');
+                row.className = 'move-row';
+                const moveNumber = (i / 2) + 1;
+                const whiteMove = moves[i] || '';
+                const blackMove = moves[i + 1] || '';
+
+                row.innerHTML = `
+                    <span class="move-num">${moveNumber}.</span>
+                    <span class="move-san">${whiteMove}</span>
+                    <span class="move-san">${blackMove}</span>
+                `;
+                historyEl.appendChild(row);
+            }
+            historyEl.scrollTop = historyEl.scrollHeight;
+        }
+
+        /* =========================================================================
+           6. نظام الساعة الدقيق باستخدام performance.now() وإيقاف المباراة فعلياً
+           ========================================================================= */
+        function formatTimeMs(ms) {
+            const totalSeconds = Math.ceil(ms / 1000);
+            const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+            const s = (totalSeconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function updateClocksDisplay() {
+            const initialSeconds = parseInt(document.getElementById('timeControl').value, 10);
+            const topClockEl = document.getElementById('topClock');
+            const bottomClockEl = document.getElementById('bottomClock');
+
+            if (initialSeconds === 0) {
+                topClockEl.textContent = '∞';
+                bottomClockEl.textContent = '∞';
+                topClockEl.classList.remove('low-time');
+                bottomClockEl.classList.remove('low-time');
+                return;
+            }
+
+            const topMs = isBoardFlipped ? whiteTimeMs : blackTimeMs;
+            const bottomMs = isBoardFlipped ? blackTimeMs : whiteTimeMs;
+
+            topClockEl.textContent = formatTimeMs(topMs);
+            bottomClockEl.textContent = formatTimeMs(bottomMs);
+
+            topClockEl.classList.toggle('low-time', topMs > 0 && topMs <= 30000);
+            bottomClockEl.classList.toggle('low-time', bottomMs > 0 && bottomMs <= 30000);
+        }
+
+        function startClock() {
+            if (timerInterval) clearInterval(timerInterval);
+            updateClocksDisplay();
+
+            const initialSeconds = parseInt(document.getElementById('timeControl').value, 10);
+            if (initialSeconds === 0) return;
+
+            lastTickTimestamp = performance.now();
+
+            timerInterval = setInterval(() => {
+                if (isGameOver()) {
+                    clearInterval(timerInterval);
+                    return;
+                }
+
+                const now = performance.now();
+                const delta = now - lastTickTimestamp;
+                lastTickTimestamp = now;
+
+                if (game.turn() === 'w') {
+                    whiteTimeMs = Math.max(0, whiteTimeMs - delta);
+                    if (whiteTimeMs <= 0) {
+                        handleTimeOut('w');
+                    }
+                } else {
+                    blackTimeMs = Math.max(0, blackTimeMs - delta);
+                    if (blackTimeMs <= 0) {
+                        handleTimeOut('b');
+                    }
+                }
+                updateClocksDisplay();
+            }, 100);
+        }
+
+        function handleTimeOut(loserColor) {
+            isGameOverByClock = true;
+            clearInterval(timerInterval);
+            createOrResetWorker(); // إيقاف أي تفكير جارٍ للذكاء الاصطناعي فوراً
+            document.getElementById('aiThinking').classList.remove('active');
+
+            const winnerName = loserColor === 'w' ? 'الأسود' : 'الأبيض';
+            const loserName = loserColor === 'w' ? 'الأبيض' : 'الأسود';
+            document.getElementById('statusText').textContent = `انتهى الوقت! فاز ${winnerName}`;
+            sound.gameOver();
+            showGameOverModal('⏰ انتهى الوقت!', `فاز ${winnerName} بعد نفاد وقت ${loserName}.`);
+        }
+
+        function showGameOverModal(title, msg) {
+            if (timerInterval) clearInterval(timerInterval);
+            document.getElementById('gameOverTitle').textContent = title;
+            document.getElementById('gameOverMessage').textContent = msg;
+            document.getElementById('gameOverModal').classList.add('show');
+        }
+
+        /* =========================================================================
+           7. ربط أزرار التحكم (إصلاح التراجع، التأكيد قبل إعادة الضبط، ومراجعة الرقعة)
+           ========================================================================= */
+        function confirmIfGameInProgress(msg) {
+            if (game.history().length > 0 && !isGameOver()) {
+                return confirm(msg);
+            }
+            return true;
+        }
+
+        document.getElementById('newGameBtn').addEventListener('click', () => {
+            if (confirmIfGameInProgress('هل تريد إنهاء المباراة الحالية وبدء مباراة جديدة؟')) {
+                initGame();
+            }
+        });
+
+        document.getElementById('playAgainBtn').addEventListener('click', () => {
+            document.getElementById('gameOverModal').classList.remove('show');
+            initGame();
+        });
+
+        document.getElementById('reviewBoardBtn').addEventListener('click', () => {
+            document.getElementById('gameOverModal').classList.remove('show');
+        });
+
+        // إصلاح التراجع بالكامل حتى عند اللعب بالأسود أو أثناء تفكير الذكاء الاصطناعي
+        document.getElementById('undoBtn').addEventListener('click', () => {
+            if (isGameOverByClock) return;
+            if (isAIThinking) {
+                createOrResetWorker();
+                isAIThinking = false;
+                document.getElementById('aiThinking').classList.remove('active');
+            }
+
+            const mode = document.getElementById('gameMode').value;
+            const userColor = document.getElementById('playerColor').value;
+
+            if (mode === 'ai') {
+                do {
+                    if (!game.undo()) break;
+                } while (game.turn() !== userColor);
+
+                if (game.turn() !== userColor && !isGameOver()) {
+                    triggerAIMove();
+                }
+            } else {
+                game.undo();
+            }
+
+            selectedSquare = null;
+            legalMovesForSelected = [];
+            const hist = game.history({ verbose: true });
+            lastMove = hist.length > 0 ? { from: hist[hist.length - 1].from, to: hist[hist.length - 1].to } : null;
+            hintMove = null;
+            renderBoard();
+            updateUI();
+        });
+
+        document.getElementById('hintBtn').addEventListener('click', () => {
+            if (isGameOver() || isAIThinking) return;
+            isAIThinking = true;
+            document.getElementById('aiThinking').classList.add('active');
+            aiWorker.postMessage({
+                reqType: 'hint',
+                fen: game.fen(),
+                depth: 3
+            });
+        });
+
+        document.getElementById('flipBtn').addEventListener('click', () => {
+            isBoardFlipped = !isBoardFlipped;
+            syncEvalBarOrientation();
+            updatePlayerHeaders();
+            updateClocksDisplay();
+            renderBoard();
+            updateUI();
+        });
+
+        document.getElementById('soundBtn').addEventListener('click', (e) => {
+            sound.enabled = !sound.enabled;
+            e.target.textContent = sound.enabled ? '🔊 الصوت: مفعل' : '🔇 الصوت: مكتوم';
+        });
+
+        document.getElementById('boardTheme').addEventListener('change', (e) => {
+            const val = e.target.value;
+            if (val === 'classic') document.documentElement.removeAttribute('data-theme');
+            else document.documentElement.setAttribute('data-theme', val);
+        });
+
+        // حفظ القيم السابقة للقوائم المنسدلة في حال ألغى المستخدم التأكيد
+        ['gameMode', 'playerColor', 'timeControl'].forEach(id => {
+            const el = document.getElementById(id);
+            el.addEventListener('focus', function() { this.dataset.prev = this.value; });
+            el.addEventListener('change', function() {
+                if (!confirmIfGameInProgress('تغيير هذا الإعداد سيبدأ مباراة جديدة. هل أنت متأكد؟')) {
+                    this.value = this.dataset.prev;
+                    return;
+                }
+                this.dataset.prev = this.value;
+                if (id === 'gameMode') {
+                    const isAI = this.value === 'ai';
+                    document.getElementById('aiLevelGroup').style.display = isAI ? 'flex' : 'none';
+                    document.getElementById('playerColorGroup').style.display = isAI ? 'flex' : 'none';
+                }
+                initGame();
+            });
+        });
+
+        document.getElementById('aiDepth').addEventListener('change', updatePlayerHeaders);
+
+        // نسخ FEN مع معالجة الأخطاء try/catch
+        document.getElementById('copyFenBtn').addEventListener('click', async () => {
+            const fenInput = document.getElementById('fenInput');
+            const btn = document.getElementById('copyFenBtn');
+            try {
+                await navigator.clipboard.writeText(fenInput.value);
+                btn.textContent = '✅';
+            } catch (err) {
+                fenInput.select();
+                document.execCommand('copy');
+                btn.textContent = '✅';
+            }
+            setTimeout(() => { btn.textContent = '📋'; }, 1200);
+        });
+
+        window.addEventListener('DOMContentLoaded', initGame);
+    </script>
+</body>
+</html>
